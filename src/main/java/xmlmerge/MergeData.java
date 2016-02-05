@@ -1,20 +1,20 @@
-package xmlupdate;
+package xmlmerge;
 
 import java.util.List;
 
-public class UpdateData{
+public class MergeData{
 
-    private List<PositionData> createList;
+    private List<CreateData> createList;
 
-    private List<String> updateList;
+    private List<UpdateData> updateList;
 
     private List<String> deleteList;
 
-    public void setCreateList(List<PositionData> createList){
+    public void setCreateList(List<CreateData> createList){
         this.createList = createList;
     }
 
-    public void setUpdateList(List<String> updateList){
+    public void setUpdateList(List<UpdateData> updateList){
         this.updateList = updateList;
     }
 
@@ -22,11 +22,11 @@ public class UpdateData{
         this.deleteList = deleteList;
     }
 
-    public List<PositionData> getCreateList(){
+    public List<CreateData> getCreateList(){
         return createList;
     }
 
-    public List<String> getUpdateList(){
+    public List<UpdateData> getUpdateList(){
         return updateList;
     }
 
@@ -34,7 +34,7 @@ public class UpdateData{
         return deleteList;
     }
 
-    public static class PositionData{
+    public static class CreateData{
 
         private String source;
 
@@ -65,5 +65,29 @@ public class UpdateData{
         public boolean isInsertBefore(){
             return insertBefore;
         }
+    }
+
+    public static class UpdateData{
+
+        private String path;
+
+        private boolean recursive;
+
+        public void setPath(String path){
+            this.path = path;
+        }
+
+        public void setRecursive(boolean recursive){
+            this.recursive = recursive;
+        }
+
+        public String getPath(){
+            return path;
+        }
+
+        public boolean isRecursive(){
+            return recursive;
+        }
+
     }
 }
