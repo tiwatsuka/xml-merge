@@ -26,35 +26,33 @@ public class XmlMerge{
             Document target = PositionalXMLReader.readXML(targetStream);
 
             XPath xpath = XPathFactory.newInstance().newXPath();
-
+            StringBuilder sb = new StringBuilder();
+            String sedFile = args[0] + ".merge.sed";
+            
             for (MergeData.CreateData cd : data.getCreateList()){
                 Node sourceNode = getFirstMatch(xpath, cd.getSource(), source);
                 Node targetNode = getFirstMatch(xpath, cd.getTarget(), target);
 
-                System.out.println(
-                		"CREATE_ELEM_START=`" +
-                		"cat -n " + args[0] + 
-                		" | sed -n -e 1," + sourceNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY) + "p" +
-                		" | sed -n -e \"/<" + sourceNode.getNodeName() + " /=\"" +
-                		" | tail -n 1`");
-                System.out.println(
-                		"CREATE_ELEM_END=" +
-                		sourceNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY));
-                System.out.println("CREATE_ELEM=`sed -n -e \"${CREATE_ELEM_START},$((CREATE_ELEM_END-1))s/$/\\\\ /g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" " + args[0] + "`");
-
+                addStartTagBeginQuery(sb, "CREATE_ELEM_START", args[0], sourceNode);
+                sb.append("CREATE_ELEM_END=")
+                	.append(sourceNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))
+                	.append("\n");
+                sb.append("CREATE_ELEM=$(")
+                	.append("sed -n -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g;")
+                	.append("s/$/\\\\\\\\/g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" ")
+                	.append(args[0])
+                	.append(" | sed -e \"\\$s/.$//g\")\n");
+                
                 if(cd.isInsertBefore()){
-                    System.out.println(
-                    		"TARGET_ELEM_START=`" +
-                    		"cat -n " + args[0] + 
-                    		" | sed -n -e 1," + targetNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY) + "p" +
-                    		" | sed -n -e \"/<" + targetNode.getNodeName() + " /=\"" +
-                    		" | tail -n 1`");
-                    System.out.println("echo -n $((TARGET_ELEM_START-1))i >> hoge.sed");
-                    System.out.println("echo \"$CREATE_ELEM\" | sed -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g\" >> hoge.sed");
+                	addStartTagBeginQuery(sb, "TARGET_ELEM_START", args[1], targetNode);
+                	sb.append("echo $((TARGET_ELEM_START-1))i \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
                 }else{
                 	int insertPos = Integer.parseInt((String)targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))-1;
-                    System.out.println("echo -n " + insertPos + "i >> hoge.sed");
-                    System.out.println("echo \"$CREATE_ELEM\" | sed -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g\" >> hoge.sed");
+                	sb.append("echo ")
+                		.append(insertPos)
+                		.append("i \"$CREATE_ELEM\" >> ")
+                		.append(sedFile)
+                		.append("\n");
                 }
             }
 
@@ -62,23 +60,33 @@ public class XmlMerge{
                 Node sourceNode = getFirstMatch(xpath, ud.getPath(), source);
                 Node targetNode = getFirstMatch(xpath, ud.getPath(), target);
 
-                Node imported = target.importNode(sourceNode, false);
+                addStartTagBeginQuery(sb,"CREATE_ELEM_START", args[0], sourceNode);
+                addStartTagBeginQuery(sb,"DELETE_ELEM_START", args[1], targetNode);
 
-                if(!ud.isRecursive()){
-                    NodeList targetChildren = targetNode.getChildNodes();
-                    for(int i=0;i<targetChildren.getLength();i++){
-                        imported.appendChild(targetChildren.item(i).cloneNode(true));
-                    }
+                if(ud.isRecursive()){
+                	sb.append("CREATE_ELEM_END=").append(sourceNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY)).append("\n");
+                	sb.append("DELETE_ELEM_END=").append(targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY)).append("\n");
+                }else{
+                	sb.append("CREATE_ELEM_END=").append(sourceNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("\n");
+                	sb.append("DELETE_ELEM_END=").append(targetNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("\n");
                 }
-                targetNode.getParentNode().replaceChild(imported, targetNode);
+                sb.append("CREATE_ELEM=$(")
+                	.append("sed -n -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g;")
+                	.append("s/$/\\\\\\\\/g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" ")
+                	.append(args[0])
+                	.append(" | sed -e \"\\$s/.$//g\")\n");
+                sb.append("echo ${DELETE_ELEM_START}i \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
+                sb.append("echo ${DELETE_ELEM_START},${DELETE_ELEM_END}d >> ").append(sedFile).append("\n");
             }
 
             for (String path : data.getDeleteList()){
                 Node targetNode = getFirstMatch(xpath, path, target);
-                targetNode.getParentNode().removeChild(targetNode);
+                addStartTagBeginQuery(sb, "DELETE_ELEM_START", args[1], targetNode);
+                sb.append("DELETE_ELEM_END=").append(targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY)).append("\n");
+                sb.append("echo ${DELETE_ELEM_START},${DELETE_ELEM_END}d >> ").append(sedFile).append("\n");
             }
 
-
+            System.out.println(sb);
         } catch (Exception ex){
             System.err.println(ex);
         }
@@ -93,4 +101,11 @@ public class XmlMerge{
         }
     }
 
+    private static void addStartTagBeginQuery(StringBuilder sb, String variable, String filename, Node node){
+    	sb.append(variable).append("=$(")
+    		.append("cat -n ").append(filename)
+    		.append(" | sed -n -e 1,").append(node.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("p")
+    		.append(" | sed -n -e \"/<").append(node.getNodeName()).append(" /=\"")
+    		.append(" | tail -n 1)\n");
+    }
 }
