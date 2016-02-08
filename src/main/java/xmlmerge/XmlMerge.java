@@ -2,13 +2,6 @@ package xmlmerge;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
 import javax.xml.xpath.XPathConstants;
@@ -24,30 +17,44 @@ public class XmlMerge{
     public static void main(String[] args){
         try(InputStream sourceStream = new FileInputStream(args[0]);
             InputStream targetStream = new FileInputStream(args[1]);
-            InputStream updateDataStream = new FileInputStream(args[0] + ".json");){
+            InputStream updateDataStream = new FileInputStream(args[0] + ".merge.json");){
 
             ObjectMapper mapper = new ObjectMapper();
             MergeData data = mapper.readValue(updateDataStream, MergeData.class);
 
-            DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-
-            Document source = builder.parse(sourceStream);
-            Document target = builder.parse(targetStream);
+            Document source = PositionalXMLReader.readXML(sourceStream);
+            Document target = PositionalXMLReader.readXML(targetStream);
 
             XPath xpath = XPathFactory.newInstance().newXPath();
-            Transformer transformer = TransformerFactory.newInstance().newTransformer();
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            transformer.setOutputProperty(OutputKeys.METHOD, "xml");
 
             for (MergeData.CreateData cd : data.getCreateList()){
                 Node sourceNode = getFirstMatch(xpath, cd.getSource(), source);
                 Node targetNode = getFirstMatch(xpath, cd.getTarget(), target);
 
-                Node imported = target.importNode(sourceNode, true);
+                System.out.println(
+                		"CREATE_ELEM_START=`" +
+                		"cat -n " + args[0] + 
+                		" | sed -n -e 1," + sourceNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY) + "p" +
+                		" | sed -n -e \"/<" + sourceNode.getNodeName() + " /=\"" +
+                		" | tail -n 1`");
+                System.out.println(
+                		"CREATE_ELEM_END=" +
+                		sourceNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY));
+                System.out.println("CREATE_ELEM=`sed -n -e \"${CREATE_ELEM_START},$((CREATE_ELEM_END-1))s/$/\\\\ /g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" " + args[0] + "`");
+
                 if(cd.isInsertBefore()){
-                    targetNode.getParentNode().insertBefore(imported, targetNode);
+                    System.out.println(
+                    		"TARGET_ELEM_START=`" +
+                    		"cat -n " + args[0] + 
+                    		" | sed -n -e 1," + targetNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY) + "p" +
+                    		" | sed -n -e \"/<" + targetNode.getNodeName() + " /=\"" +
+                    		" | tail -n 1`");
+                    System.out.println("echo -n $((TARGET_ELEM_START-1))i >> hoge.sed");
+                    System.out.println("echo \"$CREATE_ELEM\" | sed -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g\" >> hoge.sed");
                 }else{
-                    targetNode.appendChild(imported);
+                	int insertPos = Integer.parseInt((String)targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))-1;
+                    System.out.println("echo -n " + insertPos + "i >> hoge.sed");
+                    System.out.println("echo \"$CREATE_ELEM\" | sed -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g\" >> hoge.sed");
                 }
             }
 
@@ -71,9 +78,6 @@ public class XmlMerge{
                 targetNode.getParentNode().removeChild(targetNode);
             }
 
-            DOMSource out = new DOMSource(target);
-            StreamResult console = new StreamResult(System.out);
-            transformer.transform(out, console);
 
         } catch (Exception ex){
             System.err.println(ex);
