@@ -1,7 +1,10 @@
 package xmlmerge;
 
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.InputStream;
+import java.io.Writer;
+
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
 import javax.xml.xpath.XPathConstants;
@@ -10,6 +13,7 @@ import javax.xml.xpath.XPathExpressionException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class XmlMerge{
@@ -17,17 +21,23 @@ public class XmlMerge{
     public static void main(String[] args){
         try(InputStream sourceStream = new FileInputStream(args[0]);
             InputStream targetStream = new FileInputStream(args[1]);
-            InputStream updateDataStream = new FileInputStream(args[0] + ".merge.json");){
+            InputStream updateDataStream = new FileInputStream(args[0] + ".merge.json");
+        	Writer writer = new FileWriter(args[0] + ".merge.sh");){
 
             ObjectMapper mapper = new ObjectMapper();
             MergeData data = mapper.readValue(updateDataStream, MergeData.class);
 
             Document source = PositionalXMLReader.readXML(sourceStream);
             Document target = PositionalXMLReader.readXML(targetStream);
+            source.normalize();
+            target.normalize();
 
             XPath xpath = XPathFactory.newInstance().newXPath();
             StringBuilder sb = new StringBuilder();
             String sedFile = args[0] + ".merge.sed";
+            
+            sb.append("#!/bin/bash\n");
+            sb.append("rm -f ").append(sedFile).append("\n");
             
             for (MergeData.CreateData cd : data.getCreateList()){
                 Node sourceNode = getFirstMatch(xpath, cd.getSource(), source);
@@ -86,7 +96,10 @@ public class XmlMerge{
                 sb.append("echo ${DELETE_ELEM_START},${DELETE_ELEM_END}d >> ").append(sedFile).append("\n");
             }
 
-            System.out.println(sb);
+            sb.append("if test -e ").append(sedFile).append("; then\n")
+            	.append("sed -i -f ").append(sedFile).append(" ").append(args[1]).append("\n")
+            	.append("fi\n");
+            writer.append(sb);
         } catch (Exception ex){
             System.err.println(ex);
         }
@@ -105,7 +118,7 @@ public class XmlMerge{
     	sb.append(variable).append("=$(")
     		.append("cat -n ").append(filename)
     		.append(" | sed -n -e 1,").append(node.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("p")
-    		.append(" | sed -n -e \"/<").append(node.getNodeName()).append(" /=\"")
+    		.append(" | sed -n -e \"/<").append(node.getNodeName()).append(" /=;/<").append(node.getNodeName()).append(">/=\"")
     		.append(" | tail -n 1)\n");
     }
 }
