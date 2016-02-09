@@ -57,9 +57,8 @@ public class XmlMerge{
                 	addStartTagBeginQuery(sb, "TARGET_ELEM_START", args[1], targetNode);
                 	sb.append("echo $((TARGET_ELEM_START-1))i \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
                 }else{
-                	int insertPos = Integer.parseInt((String)targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))-1;
                 	sb.append("echo ")
-                		.append(insertPos)
+                		.append((String)targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))
                 		.append("i \"$CREATE_ELEM\" >> ")
                 		.append(sedFile)
                 		.append("\n");
