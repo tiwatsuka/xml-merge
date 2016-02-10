@@ -27,6 +27,7 @@ public class PositionalXMLReader {
         SAXParser parser;
         try {
             final SAXParserFactory factory = SAXParserFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             parser = factory.newSAXParser();
             final DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
             final DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();

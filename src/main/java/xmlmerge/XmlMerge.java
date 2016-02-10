@@ -23,7 +23,7 @@ public class XmlMerge{
             InputStream targetStream = new FileInputStream(args[1]);
             InputStream updateDataStream = new FileInputStream(args[0] + ".merge.json");
         	Writer writer = new FileWriter(args[0] + ".merge.sh");){
-
+        	
             ObjectMapper mapper = new ObjectMapper();
             MergeData data = mapper.readValue(updateDataStream, MergeData.class);
 
@@ -31,7 +31,7 @@ public class XmlMerge{
             Document target = PositionalXMLReader.readXML(targetStream);
             source.normalize();
             target.normalize();
-
+            
             XPath xpath = XPathFactory.newInstance().newXPath();
             StringBuilder sb = new StringBuilder();
             String sedFile = args[0] + ".merge.sed";
@@ -48,20 +48,22 @@ public class XmlMerge{
                 	.append(sourceNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))
                 	.append("\n");
                 sb.append("CREATE_ELEM=$(")
-                	.append("sed -n -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g;")
+                	.append("sed -n -e \"")
                 	.append("s/$/\\\\\\\\/g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" ")
                 	.append(args[0])
                 	.append(" | sed -e \"\\$s/.$//g\")\n");
                 
                 if(cd.isInsertBefore()){
                 	addStartTagBeginQuery(sb, "TARGET_ELEM_START", args[1], targetNode);
-                	sb.append("echo $((TARGET_ELEM_START-1))i \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
+                	sb.append("echo $((TARGET_ELEM_START-1))i\\\\ >> ").append(sedFile).append("\n")
+                	.append("echo \"$CREATE_ELEM\"\\\\ >> ").append(sedFile).append("\n")
+                	.append("echo >> ").append(sedFile).append("\n");
                 }else{
                 	sb.append("echo ")
                 		.append((String)targetNode.getUserData(PositionalXMLReader.END_LINE_NUMBER_KEY))
-                		.append("i \"$CREATE_ELEM\" >> ")
-                		.append(sedFile)
-                		.append("\n");
+                		.append("i\\\\ >> ").append(sedFile).append("\n")
+                		.append("echo \\\\ >> ").append(sedFile).append("\n")
+                		.append("echo \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
                 }
             }
 
@@ -80,11 +82,13 @@ public class XmlMerge{
                 	sb.append("DELETE_ELEM_END=").append(targetNode.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("\n");
                 }
                 sb.append("CREATE_ELEM=$(")
-                	.append("sed -n -e \"s/ /\\\\\\\\ /g;s/\\t/\\\\\\\\ \\\\\\\\ \\\\\\\\ \\\\\\\\ /g;")
+                	.append("sed -n -e \"")
                 	.append("s/$/\\\\\\\\/g;${CREATE_ELEM_START},${CREATE_ELEM_END}p\" ")
                 	.append(args[0])
                 	.append(" | sed -e \"\\$s/.$//g\")\n");
-                sb.append("echo ${DELETE_ELEM_START}i \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
+
+                sb.append("echo ${DELETE_ELEM_START}i\\\\ >> ").append(sedFile).append("\n")
+                		.append("echo \"$CREATE_ELEM\" >> ").append(sedFile).append("\n");
                 sb.append("echo ${DELETE_ELEM_START},${DELETE_ELEM_END}d >> ").append(sedFile).append("\n");
             }
 
@@ -117,7 +121,7 @@ public class XmlMerge{
     	sb.append(variable).append("=$(")
     		.append("cat -n ").append(filename)
     		.append(" | sed -n -e 1,").append(node.getUserData(PositionalXMLReader.START_LINE_NUMBER_KEY)).append("p")
-    		.append(" | sed -n -e \"/<").append(node.getNodeName()).append(" /=;/<").append(node.getNodeName()).append(">/=\"")
+    		.append(" | sed -n -e \"/<").append(node.getNodeName()).append("\\( \\|\\n\\|\\/\\|>\\)/=\"")
     		.append(" | tail -n 1)\n");
     }
 }
