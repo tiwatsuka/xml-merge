@@ -40,8 +40,7 @@ public class MergeData{
 
         private String target;
 
-        private boolean insertBefore;
-
+        private boolean insertBefore = false;
         public void setSource(String source){
             this.source = source;
         }
@@ -71,7 +70,7 @@ public class MergeData{
 
         private String path;
 
-        private boolean recursive;
+        private boolean recursive = false;
 
         public void setPath(String path){
             this.path = path;
